@@ -7,7 +7,6 @@ import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Component
-import java.time.LocalDate
 
 @Component
 class MonthlyAggregationTasklet(
@@ -15,8 +14,8 @@ class MonthlyAggregationTasklet(
 ) : Tasklet {
 
     override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
-        val raw = chunkContext.stepContext.stepExecution.jobParameters.getString("businessDate")
-        val bizDate = JobParam.requireBusinessDate(raw)
+        val raw = chunkContext.stepContext.stepExecution.jobParameters.getString(JobParam.BUSINESS_DATE)
+        val bizDate = JobParam.businessDateOrToday(raw)
 
         val monthStart = bizDate.withDayOfMonth(1)
         val nextMonthStart = monthStart.plusMonths(1)
