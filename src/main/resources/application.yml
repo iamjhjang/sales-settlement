@@ -3,24 +3,17 @@ spring:
     url: jdbc:postgresql://localhost:5432/settlement_shop
     username: settlement
     password: settlement
+
+  flyway:
+    enabled: false
+
   jpa:
     hibernate:
       ddl-auto: validate
-    properties:
-      hibernate:
-        format_sql: true
     open-in-view: false
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
+
   batch:
     jdbc:
-      initialize-schema: always
-
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-
-logging:
-  level:
-    org.hibernate.SQL: debug
+      initialize-schema: never
+    job:
+      enabled: false   # 부팅할 때 Job 자동 실행 막기
