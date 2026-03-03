@@ -4,8 +4,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
-class SalesSettlementApplication
+class SettlementApplication
 
 fun main(args: Array<String>) {
-    runApplication<SalesSettlementApplication>(*args)
+    runApplication<SettlementApplication>(*args)
 }

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: settlement-postgres
+    environment:
+      POSTGRES_DB: settlement_shop
+      POSTGRES_USER: settlement
+      POSTGRES_PASSWORD: settlement
+    ports:
+      - "5432:5432"
+    volumes:
+      - settlement_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U settlement -d settlement_shop"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  settlement_pg_data:
