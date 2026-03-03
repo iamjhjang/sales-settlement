@@ -15,8 +15,8 @@ class DailyAggregationTasklet(
 ) : Tasklet {
 
     override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
-        val jobParams = chunkContext.stepContext.jobParameters
-        val bizDate: LocalDate = JobParam.requireBusinessDate(jobParams[JobParam.BUSINESS_DATE] as String?)
+        val raw = chunkContext.stepContext.stepExecution.jobParameters.getString("businessDate")
+        val bizDate = JobParam.requireBusinessDate(raw)
 
         jdbc.update(
             """

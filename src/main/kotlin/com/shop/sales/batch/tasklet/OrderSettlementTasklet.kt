@@ -15,9 +15,9 @@ class OrderSettlementTasklet(
     private val jdbc: NamedParameterJdbcTemplate,
 ) : Tasklet {
 
-    override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
-        val jobParams = chunkContext.stepContext.jobParameters
-        val bizDate: LocalDate = JobParam.requireBusinessDate(jobParams[JobParam.BUSINESS_DATE] as String?)
+    override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus? {
+        val raw = chunkContext.stepContext.stepExecution.jobParameters.getString("businessDate")
+        val bizDate = JobParam.requireBusinessDate(raw)
 
         val zone = ZoneId.of("Asia/Seoul")
         val fromTs = bizDate.atStartOfDay(zone).toOffsetDateTime()
@@ -25,7 +25,8 @@ class OrderSettlementTasklet(
 
         val jobExecutionId = chunkContext.stepContext.stepExecution.jobExecutionId
 
-        val inserted = jdbc.update(
+        // 1) 정산원장 적재 (멱등)
+        val inserted: Int = jdbc.update(
             """
             insert into tb_sales_settlement(
                 order_id, order_no, brand_id, item_code, qty, unit_price, amount,
@@ -39,10 +40,15 @@ class OrderSettlementTasklet(
               and o.delivered_at >= :fromTs and o.delivered_at < :toTs
             on conflict (order_id) do nothing
             """.trimIndent(),
-            mapOf("fromTs" to fromTs, "toTs" to toTs, "jobExecutionId" to jobExecutionId)
+            mapOf(
+                "fromTs" to fromTs,
+                "toTs" to toTs,
+                "jobExecutionId" to jobExecutionId
+            )
         )
 
-        val updated = jdbc.update(
+        // 2) 주문 settled_at 업데이트 (정산원장에 들어간 것만)
+        val updated: Int = jdbc.update(
             """
             update tb_order o
                set settled_at = now()
@@ -54,8 +60,7 @@ class OrderSettlementTasklet(
             mapOf("fromTs" to fromTs, "toTs" to toTs)
         )
 
-        contribution.incrementWriteCount(inserted)
-        contribution.incrementWriteCount(updated)
+        contribution.incrementWriteCount((inserted + updated).toLong())
 
         return RepeatStatus.FINISHED
     }
