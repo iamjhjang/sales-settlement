@@ -6,7 +6,7 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
 ## 1. 목표
 - Kotlin + Spring Boot로 주문/배송완료/취소/정산 흐름 구현
 - 정산 집계는 Spring Batch로 수행
-- PostgreSQL + Flyway로 스키마 관리
+- PostgreSQL
 - Swagger(OpenAPI)로 API 테스트 가능
 - 조회 성능: 브랜드/품목코드/주문번호 기준 빠른 조회
 - 
@@ -22,7 +22,6 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
 - Framework: Spring Boot 4.x, Spring Web, Validation, Spring Data JPA
 - Batch: Spring Batch
 - DB: PostgreSQL
-- Migration: Flyway
 - API Doc: springdoc-openapi (Swagger UI)
 - Build: Gradle (Kotlin DSL)
 - Local Runtime: Docker Compose

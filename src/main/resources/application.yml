@@ -9,8 +9,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
-    open-in-view: false
+      ddl-auto: none
 
   batch:
     jdbc:
