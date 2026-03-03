@@ -9,12 +9,12 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
 - PostgreSQL
 - Swagger(OpenAPI)로 API 테스트 가능
 - 조회 성능: 브랜드/품목코드/주문번호 기준 빠른 조회
-- 
+
 ### 1.1 주요 도메인
-* Catalog: 브랜드/상품/전시(선택)
-* Order: 주문, 주문상태(배송완료/취소)
-* Sales: 정산 원장 및 집계(일/월/년)
-* Common: 공통 응답/예외/유틸/로깅/상수
+- Catalog: 브랜드/상품/전시(선택)
+- Order: 주문, 주문상태(배송완료/취소)
+- Sales: 정산 원장 및 집계(일/월/년)
+- Common: 공통 응답/예외/유틸/로깅/상수
 
 
 ## 2. 기술스팩
@@ -57,7 +57,7 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
 
 ## 4. 처리 흐름(Flow)
   A [주문 생성 API]
-     -> (주문요청) [tb_order 저장]
+     -> (주문요청) [tb_order 저장] (status=ORDER)
   B [주문 상태 변경 API]
      -> (배송완료) [tb_order.status=COMPLETED / tb_order.status_changed_at=getdate(), tb_delivery 저장 (delivery_dt)]
      -> (주문취소) [tb_order.status=CANCELED  / tb_order.status_changed_at=getdate()]
@@ -114,27 +114,48 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
       1) sales_year , brand_id , item_code
     2) 
 
-## 6. 배치
-### 6.1 Job: salesSettlementJob
-#### 6.1.1 배치대상
+## 6. 배포/실행
+
+## 6.1 실행
+- docker compose up -d
+- ./gradlew clean bootRun
+
+## 6.2 스키마/샘플 데이터 스크립트 
+- `src/main/resources/schema.sql` : 업무 테이블(tb_*) + Spring Batch 메타 테이블(BATCH_*)
+- `src/main/resources/data.sql` : 샘플 데이터(브랜드/상품/주문/배송)
+
+## 7. 배치
+### 7.1 Job: salesSettlementJob
+- 정산 기준일 파라미터: businessDate=yyyy-MM-dd
+
+### 7.2 배치 강제 실행(REST)
+- curl -X POST "http://localhost:8080/batch/sales-settlement/run?businessDate=2026-03-02"
+
+### 7.3 배치처리대상
   - `tb_order.status = 'COMPLETED' ` (배송완료)
   - `tb_order.settled_at IS NULL ` (정산 미처리)
   - `tb_delivery.delivery_dt` (정산 기준일)
 
-#### 6.1.2 배치대상
+### 7.4 배치처리내용
   - `tb_sales_detail ` (원장 UPSERT)
   - `tb_sales_daily/monthly/yearly` (일/월/년 UPSERT)
   - `tb_order.settled_at = now()` (정산완료)
 
+### 7.5 결과 확인 SQL
+- select count(*) from tb_sales_detail where sales_date='2026-03-02';
+- select * from tb_sales_daily where sales_day='2026-03-02' limit 20;
+- select * from tb_sales_monthly where sales_month='2026-03' limit 20;
+- select * from tb_sales_yearly where sales_year='2026' limit 20;
+- 
 
-## 7. API 
-Swagger UI : http://localhost:8080/swagger-ui.html
+## 8. API 
+Swagger UI : http://localhost:8080/swagger-ui/index.html
 
-### 7.1 Order
+### 8.1 Order
  - 주문 생성    : POST /api/v1/orders
  - 주문 상태변경 : POST /api/v1/orders/status
 
-### 7.2 Sales
+### 8.2 Sales
  - 원장 조회 : POST /api/v1/sales/detail
  - 일원장보회: POST /api/v1/sales/daily
  - 월원장보회: POST /api/v1/sales/monthly
