@@ -48,10 +48,9 @@ class SalesSettlementBatchController(
             )
         }
 
-        // businessDate 반드시 포함 + identifying=true 명시(누락/미표시 방지)
         val params = JobParametersBuilder()
-            .addString("businessDate", bizDate.toString(), true)
-            .addLong("run.id", System.currentTimeMillis(), true) // 재실행용 유니크 키
+            .addString("businessDate", bizDate.toString(), true) // identifying
+            .addLong("runId", System.currentTimeMillis(), true)  // identifying (재실행용)
             .toJobParameters()
 
         val execution = jobOperator.start(salesSettlementJob, params)

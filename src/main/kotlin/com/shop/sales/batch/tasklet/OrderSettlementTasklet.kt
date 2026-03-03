@@ -7,7 +7,7 @@ import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Component
-import java.time.ZoneId
+import java.time.LocalDate
 
 @Component
 class OrderSettlementTasklet(
@@ -15,51 +15,74 @@ class OrderSettlementTasklet(
 ) : Tasklet {
 
     override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus? {
+
         val raw = chunkContext.stepContext.stepExecution.jobParameters.getString(JobParam.BUSINESS_DATE)
-        val bizDate = JobParam.businessDateOrToday(raw)
+        val bizDate = JobParam.requireBusinessDate(raw)
 
-        val zone = ZoneId.of("Asia/Seoul")
-        val fromTs = bizDate.atStartOfDay(zone).toOffsetDateTime()
-        val toTs = bizDate.plusDays(1).atStartOfDay(zone).toOffsetDateTime()
+        val fromTs = bizDate.atStartOfDay()              // TIMESTAMP (no tz) - delivery_dt 타입과 일치
+        val toTs = bizDate.plusDays(1).atStartOfDay()
 
-        val jobExecutionId = chunkContext.stepContext.stepExecution.jobExecutionId
-
-        // 1) 정산원장 적재 (멱등)
-        val inserted: Int = jdbc.update(
+        // 1) 원장(tb_sales_detail) 적재 (멱등: order_no UNIQUE)
+        val upserted: Int = jdbc.update(
             """
-            insert into tb_sales_settlement(
-                order_id, order_no, brand_id, item_code, qty, unit_price, amount,
-                delivered_at, business_date, job_execution_id
+            insert into tb_sales_detail(
+                order_no, sales_date, brand_id, item_code, item_name,
+                qty, amount, delivery_fee, status,
+                created_at, updated_at, created_by, updated_by
             )
             select
-                o.order_id, o.order_no, o.brand_id, o.item_code, o.qty, o.unit_price, o.amount,
-                o.delivered_at, date(o.delivered_at), :jobExecutionId
+                o.order_no,
+                date(d.delivery_dt) as sales_date,
+                o.brand_id,
+                o.item_code,
+                o.item_name,
+                o.qty,
+                o.amount,
+                d.delivery_fee,
+                o.status,
+                now(), now(), 'batch', 'batch'
             from tb_order o
-            where o.status = 'DELIVERED'
-              and o.delivered_at >= :fromTs and o.delivered_at < :toTs
-            on conflict (order_id) do nothing
-            """.trimIndent(),
-            mapOf(
-                "fromTs" to fromTs,
-                "toTs" to toTs,
-                "jobExecutionId" to jobExecutionId
-            )
-        )
-
-        // 2) 주문 settled_at 업데이트 (정산원장에 들어간 것만)
-        val updated: Int = jdbc.update(
-            """
-            update tb_order o
-               set settled_at = now()
-             where o.status = 'DELIVERED'
-               and o.settled_at is null
-               and o.delivered_at >= :fromTs and o.delivered_at < :toTs
-               and exists (select 1 from tb_sales_settlement s where s.order_id = o.order_id)
+            join tb_delivery d on d.order_id = o.order_id
+            where o.status = 'COMPLETED'
+              and o.settled_at is null
+              and d.delivery_dt >= :fromTs and d.delivery_dt < :toTs
+            on conflict (order_no)
+            do update set
+                sales_date    = excluded.sales_date,
+                brand_id      = excluded.brand_id,
+                item_code     = excluded.item_code,
+                item_name     = excluded.item_name,
+                qty           = excluded.qty,
+                amount        = excluded.amount,
+                delivery_fee  = excluded.delivery_fee,
+                status        = excluded.status,
+                updated_at    = now(),
+                updated_by    = 'batch'
             """.trimIndent(),
             mapOf("fromTs" to fromTs, "toTs" to toTs)
         )
 
-        contribution.incrementWriteCount((inserted + updated).toLong())
+        // 2) tb_order settled_at 업데이트 (원장에 들어간 주문만)
+        val updatedOrders: Int = jdbc.update(
+            """
+            update tb_order o
+               set settled_at = now(),
+                   updated_at = now(),
+                   updated_by = 'batch'
+             where o.status = 'COMPLETED'
+               and o.settled_at is null
+               and exists (
+                   select 1
+                     from tb_sales_detail s
+                    where s.order_no = o.order_no
+                      and s.sales_date = :bizDate
+               )
+            """.trimIndent(),
+            mapOf("bizDate" to bizDate)
+        )
+
+        // Spring Batch 6: writeCount는 long
+        contribution.incrementWriteCount((upserted + updatedOrders).toLong())
 
         return RepeatStatus.FINISHED
     }
