@@ -59,8 +59,8 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
   A [주문 생성 API]
      -> (주문요청) [tb_order 저장] (status=ORDER)
   B [주문 상태 변경 API]
-     -> (배송완료) [tb_order.status=COMPLETED / tb_order.status_changed_at=getdate(), tb_delivery 저장 (delivery_dt)]
-     -> (주문취소) [tb_order.status=CANCELED  / tb_order.status_changed_at=getdate()]
+     -> (배송완료) [tb_order.status=COMPLETED / tb_order.status_changed_at=CURRENT_TIMESTAMP, tb_delivery 저장 (delivery_dt)]
+     -> (주문취소) [tb_order.status=CANCELED  / tb_order.status_changed_at=CURRENT_TIMESTAMP]
   C [Spring Batch 정산 집계 Job]
      -> (원장집계) [tb_sales_detail UPSERT]
      -> (일/월/일) [tb_sales_daily/monthly/yearly UPSERT]
@@ -86,8 +86,8 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
       1) status , settled_at (집계용)
       2) brand_id, status, ordered_at ( 조회용)
 * tb_delivery
-  - delivery_id(PK), order_id(UNIQUE) , delivery_dt, delivery_fee , 
-    created_by , updated_at, created_by  , updated_by
+  - delivery_id(PK), order_id(UNIQUE) , delivery_dt, delivery_fee ,
+    created_at , updated_at, created_by  , updated_by
   - indexes: 
       1) delivery_dt(조회용)
     
@@ -114,22 +114,26 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
       1) sales_year , brand_id , item_code
     2) 
 
-## 6. 배포/실행
+## 6. 실행
 
-## 6.1 실행
-- docker compose up -d
-- ./gradlew clean bootRun
+## 6.1 Quick Start
+> DB(PostgreSQL) + 애플리케이션을 한 번에 기동합니다.
+> 프로젝트 루트에서 실행
+- .\src\main\resources\script\run.ps1
 
 ## 6.2 스키마/샘플 데이터 스크립트 
-- `src/main/resources/schema.sql` : 업무 테이블(tb_*) + Spring Batch 메타 테이블(BATCH_*)
-- `src/main/resources/data.sql` : 샘플 데이터(브랜드/상품/주문/배송)
+- `src/main/resources/script/schema.sql` : 업무 테이블(tb_*) + Spring Batch 메타 테이블(BATCH_*)
+- `src/main/resources/script/data.sql` : 샘플 데이터(브랜드/상품/주문/배송)
 
 ## 7. 배치
 ### 7.1 Job: salesSettlementJob
 - 정산 기준일 파라미터: businessDate=yyyy-MM-dd
 
 ### 7.2 배치 강제 실행(REST)
-- curl -X POST "http://localhost:8080/batch/sales-settlement/run?businessDate=2026-03-02"
+> 애플리케이션 기동 후 아래 호출로 배치를 실행합니다.
+- curl -X POST "http://localhost:8080/batch/sales-settlement/run?businessDate=2026-02-27"
+- curl -X POST "http://localhost:8080/batch/sales-settlement/run?businessDate=2026-03-03"
+- curl -X POST "http://localhost:8080/batch/sales-settlement/run?businessDate=2026-03-04"
 
 ### 7.3 배치처리대상
   - `tb_order.status = 'COMPLETED' ` (배송완료)
@@ -142,11 +146,24 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
   - `tb_order.settled_at = now()` (정산완료)
 
 ### 7.5 결과 확인 SQL
-- select count(*) from tb_sales_detail where sales_date='2026-03-02';
-- select * from tb_sales_daily where sales_day='2026-03-02' limit 20;
-- select * from tb_sales_monthly where sales_month='2026-03' limit 20;
-- select * from tb_sales_yearly where sales_year='2026' limit 20;
-- 
+> 2026-02-27 집계 확인
+- select count(*) from tb_sales_detail where sales_date = '2026-02-27';
+- select * from tb_sales_daily   where sales_day   = '2026-02-27' limit 20;
+- select * from tb_sales_monthly where sales_month = '2026-02'    limit 20;
+- select * from tb_sales_yearly  where sales_year  = '2026'       limit 20;
+
+> 2026-03-03 집계 확인
+- select count(*) from tb_sales_detail where sales_date = '2026-03-03';
+- select * from tb_sales_daily   where sales_day   = '2026-03-03' limit 20;
+- select * from tb_sales_monthly where sales_month = '2026-03'    limit 20;
+- select * from tb_sales_yearly  where sales_year  = '2026'       limit 20;
+
+> 정산완료 마킹 확인
+select order_no, status, settled_at
+from tb_order
+where status = 'COMPLETED'
+order by order_id desc
+limit 20;
 
 ## 8. API 
 Swagger UI : http://localhost:8080/swagger-ui/index.html
