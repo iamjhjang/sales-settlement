@@ -173,7 +173,6 @@ Swagger UI : http://localhost:8080/swagger-ui/index.html
  - 주문 상태변경 : POST /api/v1/orders/status
 
 ### 8.2 Sales
- - 원장 조회 : POST /api/v1/sales/detail
- - 일원장보회: POST /api/v1/sales/daily
- - 월원장보회: POST /api/v1/sales/monthly
- - 년원장보회: POST /api/v1/sales/yearly
+- 정산 원장(상세) 조회 : GET /api/v1/sales/detail
+- 참고: 일/월/년 집계 데이터는 배치가 `tb_sales_daily/monthly/yearly`에 적재하며,
+    README의 "결과 확인 SQL"로 검증합니다.
