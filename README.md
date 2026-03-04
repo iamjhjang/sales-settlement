@@ -117,6 +117,11 @@ Kotlin + Spring Boot 기반으로 주문 → 배송완료/취소 → 정산(일/
 ## 6. 실행
 
 ## 6.1 Quick Start
+1) DB 실행(PostgreSQL): `docker compose up -d`
+2) 앱 실행: `./gradlew clean bootRun` (Windows는 `gradlew.bat clean bootRun`)
+3) Swagger: http://localhost:8080/swagger-ui/index.html
+
+## (옵션) One-command 실행 (Windows/PowerShell)
 > DB(PostgreSQL) + 애플리케이션을 한 번에 기동합니다.
 > 프로젝트 루트에서 실행
 - .\src\main\resources\script\run.ps1
